@@ -29,7 +29,7 @@ function flattenOptions (values, label) {
   return (options) =>
     options.reduce((prev, curr) => {
       /* istanbul ignore else */
-      if (curr[label]) {
+      if (curr[label] && curr[label] !== 'Other categories') {
         prev.push({
           $groupLabel: curr[label],
           $isLabel: true
@@ -50,7 +50,7 @@ function filterGroups (search, label, values, groupLabel, customLabel, uncollaps
         console.warn(`Options passed to vue-multiselect do not contain groups, despite the config.`)
         return []
       }
-      if (!search && !uncollapsed.includes(group[groupLabel])) {
+      if (!search && !uncollapsed.includes(group[groupLabel]) && group[groupLabel] !== 'Other categories') {
         // Collapsed
         return {
           [groupLabel]: group[groupLabel],
