@@ -31,18 +31,20 @@ function flattenOptions (values, label) {
   return (options) =>
     options.reduce((prev, curr) => {
       /* istanbul ignore else */
-      if (curr[values] && curr[values].length) {
+      if (curr[label] && curr[label] !== 'Other categories') {
         prev.push({
           $groupLabel: curr[label],
           $isLabel: true
         })
+      }
+      if (curr[values] && curr[values].length) {
         return prev.concat(curr[values])
       }
       return prev
     }, [])
 }
 
-function filterGroups (search, label, values, groupLabel, customLabel) {
+function filterGroups (search, label, values, groupLabel, customLabel, uncollapsed) {
   return (groups) =>
     groups.map((group) => {
       /* istanbul ignore else */
@@ -50,6 +52,14 @@ function filterGroups (search, label, values, groupLabel, customLabel) {
         console.warn(`Options passed to vue-multiselect do not contain groups, despite the config.`)
         return []
       }
+      if (!search && !uncollapsed.includes(group[groupLabel]) && group[groupLabel] !== 'Other categories') {
+        // Collapsed
+        return {
+          [groupLabel]: group[groupLabel],
+          [values]: []
+        }
+      }
+
       const groupOptions = filterOptions(group[values], search, label, customLabel)
 
       return groupOptions.length
@@ -69,7 +79,8 @@ export default {
       search: '',
       isOpen: false,
       preferredOpenDirection: 'below',
-      optimizedHeight: this.maxHeight
+      optimizedHeight: this.maxHeight,
+      uncollapsed: []
     }
   },
   props: {
@@ -309,6 +320,15 @@ export default {
       default: false
     },
     /**
+     * Collapsed
+     * @default false
+     * @type {Boolean}
+    */
+    collapsed: {
+      type: Boolean,
+      default: false
+    },
+    /**
      * Prevent autofocus
      * @default false
      * @type {Boolean}
@@ -363,6 +383,13 @@ export default {
         } else {
           options.unshift({isTag: true, label: search})
         }
+      }
+
+      if (this.$refs.list) {
+        const scrollTop = this.$refs.list.scrollTop
+        this.$nextTick(() => {
+          this.$refs.list.scrollTop = scrollTop
+        })
       }
 
       return options.slice(0, this.optionsLimit)
@@ -421,7 +448,7 @@ export default {
      */
     filterAndFlat (options, search, label) {
       return flow(
-        filterGroups(search, label, this.groupValues, this.groupLabel, this.customLabel),
+        filterGroups(search, label, this.groupValues, this.groupLabel, this.customLabel, this.uncollapsed),
         flattenOptions(this.groupValues, this.groupLabel)
       )(options)
     },
@@ -504,9 +531,22 @@ export default {
      */
     select (option, key) {
       /* istanbul ignore else */
-      if (option.$isLabel && this.groupSelect) {
-        this.selectGroup(option)
-        return
+      if (option.$isLabel) {
+        if (this.collapsed) {
+          if (this.uncollapsed.includes(option.$groupLabel)) {
+            this.uncollapsed.splice(this.uncollapsed.findIndex(o => o === option.$groupLabel), 1)
+          } else {
+            const scrollTop = this.$refs.list.scrollTop
+            this.uncollapsed.push(option.$groupLabel)
+            this.$nextTick(() => {
+              this.$refs.list.scrollTop = scrollTop
+            })
+          }
+        }
+        if (this.groupSelect) {
+          this.selectGroup(option)
+          return
+        }
       }
       if (this.blockKeys.indexOf(key) !== -1 ||
         this.disabled ||
